@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Rocket, ShieldCheck, TrendingUp } from "lucide-react"
+import Image from "next/image"
 import { EmbeddedAuthForm } from "@crossmint/client-sdk-react-ui"
 
 const features = [
@@ -9,19 +9,19 @@ const features = [
     title: "Non-Custodial Wallets",
     description:
       "User-controlled wallets where Crossmint and the developer never take custody of funds. Funded by direct transfer or fiat onramp.",
-    Icon: ShieldCheck,
+    iconPath: "/shield-check.svg",
   },
   {
     title: "Delegated Signing",
     description:
       "Authorize a server-side signer once. The agent gets its own key, bound to scoped permissions the user signs off on.",
-    Icon: TrendingUp,
+    iconPath: "/key-round.svg",
   },
   {
     title: "Autonomous Payments",
     description:
       "Agents sign and submit stablecoin transfers with their own key — no user prompt per action. Anything outside scope is rejected.",
-    Icon: Rocket,
+    iconPath: "/rocket.svg",
   },
 ]
 
@@ -86,8 +86,14 @@ export function LandingPage({ isLoading }: { isLoading: boolean }) {
                   transitionDelay: showFeatures ? `${index * 150}ms` : "0ms",
                 }}
               >
-                <div className="w-10 h-10 border-white/20 border-2 rounded-full flex items-center justify-center self-center flex-shrink-0 text-primary">
-                  <feature.Icon className="w-5 h-5" />
+                <div className="w-10 h-10 border-white/20 border-2 rounded-full flex items-center justify-center self-center flex-shrink-0">
+                  <Image
+                    className="filter-green w-6"
+                    src={feature.iconPath}
+                    alt={feature.title}
+                    width={20}
+                    height={20}
+                  />
                 </div>
                 <div>
                   <h3 className="font-medium text-white">{feature.title}</h3>
@@ -100,7 +106,7 @@ export function LandingPage({ isLoading }: { isLoading: boolean }) {
       </div>
 
       {/* Right side - Auth Form */}
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-6 py-12 col-span-1 lg:col-span-3">
+      <div className="flex flex-col items-center justify-center bg-gray-50 px-6 py-12 col-span-1 lg:col-span-3">
         <div className="lg:hidden mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Stablecoin Wallet for Agents
