@@ -1,45 +1,72 @@
-# Stablecoin Wallet Quickstart
 
-A Next.js example that walks through creating a wallet, authorizing a server-side signer, funding it, and sending stablecoin (USDXM) transfers — using the [Crossmint Wallets SDK](https://docs.crossmint.com/wallets/overview) on Base Sepolia.
 
-The flow demonstrates a common pattern for agent-driven payments: the user authorizes a backend signer once (with email-OTP approval), and from then on the backend can sign transfers without further user prompts.
+<div align="center">
+<img width="200" alt="Image" src="https://github.com/user-attachments/assets/8b617791-cd37-4a5a-8695-a7c9018b7c70" />
+<br>
+<br>
+<h1>Stablecoin Wallet Quickstart</h1>
 
-## What it demonstrates
+<div align="center">
+<a href="https://docs.crossmint.com/wallets/overview">Docs</a> | <a href="https://www.crossmint.com/quickstarts">See all quickstarts</a>
+</div>
 
-1. **Wallet creation on login.** `<CrossmintWalletProvider>` auto-creates a Base Sepolia wallet for the authenticated user, with email recovery.
-2. **Authorizing a server signer.** A server action registers the signer in `prepareOnly` mode. The client switches to the email recovery signer and approves the pending registration via OTP. The signer secret never leaves the server.
-3. **Funding and reading balances.** Staging-only `wallet.stagingFund(amount)` mints USDXM into the wallet for testing.
-4. **Sending stablecoin.** A server action signs the transfer with the server signer — no user prompt at send time.
+<br>
+<br>
+</div>
 
-## Prerequisites
+## Introduction
+Create a wallet, authorize a server-side signer, and send stablecoin transfers using the [Crossmint Wallets SDK](https://docs.crossmint.com/wallets/overview) on Base Sepolia. This quickstart demonstrates a common pattern for agent-driven payments: the user or AI agent authorizes a backend signer once, and from then on the backend can sign transfers without further prompts.
 
-- Node.js 20+ and [pnpm](https://pnpm.io/)
-- A [Crossmint staging](https://staging.crossmint.com/) project
+**Learn how to:**
+- Create a wallet on login with email recovery
+- Authorize a server-side signer with email-OTP approval
+- Fund a wallet with USDXM (test stablecoin)
+- Send stablecoin transfers signed by the server signer
+
+## Deploy
+Easily deploy the template to Vercel with the button below. You will need to set the required environment variables in the Vercel dashboard.
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FCrossmint%2Fstablecoin-wallet-quickstart&env=NEXT_PUBLIC_CROSSMINT_CLIENT_API_KEY,CROSSMINT_SERVER_SIDE_API_KEY,CROSSMINT_SIGNER_SECRET)
 
 ## Setup
-
+1. Clone the repository and navigate to the project folder:
 ```bash
+git clone https://github.com/Crossmint/stablecoin-wallet-quickstart.git && cd stablecoin-wallet-quickstart
+```
+
+2. Install all dependencies:
+```bash
+npm install
+# or
+yarn install
+# or
 pnpm install
+# or
+bun install
+```
+
+3. Set up the environment variables:
+```bash
 cp .env.example .env.local
 ```
 
-Fill in `.env.local`:
-
-- `NEXT_PUBLIC_CROSSMINT_CLIENT_API_KEY` — client-side key from the [Crossmint console](https://staging.crossmint.com/console/projects/apiKeys)
-- `CROSSMINT_SERVER_SIDE_API_KEY` — server-side key with the `wallets.create` scope
-- `CROSSMINT_SIGNER_SECRET` — 64-char hex string (or `xmsk1_<64-hex>`); used by the server signer, stays on the server
-
-## Run
-
+4. Get your API keys from the [Crossmint staging console](https://staging.crossmint.com/console/projects/apiKeys) and add them to the `.env.local` file. The server-side key needs the `wallets.create` scope.
 ```bash
-pnpm dev
+NEXT_PUBLIC_CROSSMINT_CLIENT_API_KEY=your_crossmint_client_api_key
+CROSSMINT_SERVER_SIDE_API_KEY=your_crossmint_server_api_key
+CROSSMINT_SIGNER_SECRET=your_64_char_hex_string
 ```
 
-Open <http://localhost:3000> and sign in with email or Google. Toggle **Show code** in the header to see the SDK calls behind each step.
+5. Run the development server:
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
 
-## Project layout
-
-- `app/layout.tsx` — Crossmint providers and chain config
-- `app/page.tsx` — top-level UI orchestrating the four steps
-- `app/actions/` — server actions: `add-server-signer.ts`, `send-usdxm.ts`
-- `components/` — section components for wallet, signer authorization, balance, and send
+## Using in production
+1. Create a [production API key](https://docs.crossmint.com/introduction/platform/api-keys/client-side).
