@@ -121,7 +121,7 @@ export function LandingPage({ isLoading }: { isLoading: boolean }) {
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <div className="w-full max-w-md bg-white rounded-3xl border shadow-lg overflow-hidden">
+          <div className="w-full max-w-md bg-white rounded-3xl border shadow-lg overflow-hidden flex items-center justify-center">
             <EmbeddedAuthForm />
           </div>
         )}
