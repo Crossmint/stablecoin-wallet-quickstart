@@ -1,17 +1,18 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Code2, LogIn } from "lucide-react"
+import { Code2 } from "lucide-react"
 import { useCrossmintAuth, useWallet } from "@crossmint/client-sdk-react-ui"
 import type { Signer } from "@crossmint/wallets-sdk"
 import { WalletSection } from "@/components/wallet-section"
 import { ServerSignerSection } from "@/components/server-signer-section"
 import { WalletBalance } from "@/components/wallet-balance"
 import { SendSection } from "@/components/send-section"
-import { PoweredByCrossmint } from "@/components/powered-by-crossmint"
+import { LandingPage } from "@/components/landing-page"
+import { Footer } from "@/components/footer"
 
 export default function Page() {
-  const { login, logout, user } = useCrossmintAuth()
+  const { logout, user } = useCrossmintAuth()
   const { wallet, status } = useWallet()
 
   const userEmail = user?.email ?? ""
@@ -33,32 +34,10 @@ export default function Page() {
   }, [refreshSigners])
   const hasServerSigner = signers.some((s) => s.type === "server")
 
+  const isLoading = status === "in-progress" || status === "not-loaded"
+
   if (!user) {
-    return (
-      <div className="flex min-h-dvh flex-col">
-        <div className="flex flex-1 flex-col items-center justify-center gap-6 px-4">
-          <div className="space-y-1.5 text-center">
-            <h1 className="text-lg font-semibold">
-              Stablecoin Wallet Quickstart
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Sign in to create a wallet and start sending and receiving
-              stablecoins.
-            </p>
-          </div>
-          <button
-            onClick={login}
-            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80 disabled:pointer-events-none disabled:opacity-50"
-          >
-            <LogIn className="size-3.5" />
-            Sign in
-          </button>
-        </div>
-        <div className="flex justify-center border-t border-border py-4">
-          <PoweredByCrossmint />
-        </div>
-      </div>
-    )
+    return <LandingPage isLoading={isLoading} />
   }
 
   return (
@@ -115,9 +94,7 @@ export default function Page() {
           )}
         </div>
       </div>
-      <div className="flex justify-center border-t border-border py-4">
-        <PoweredByCrossmint />
-      </div>
+      <Footer />
     </div>
   )
 }
