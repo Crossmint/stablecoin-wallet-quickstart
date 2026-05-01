@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useCrossmintAuth, useWallet } from "@crossmint/client-sdk-react-ui"
-import type { Signer } from "@crossmint/wallets-sdk"
+import type { Chain, Signer, Wallet } from "@crossmint/wallets-sdk"
 import { Check, Circle } from "lucide-react"
 import { ViewToggle } from "@/components/wallet-step"
 import { prepareServerSigner } from "@/app/actions/add-server-signer"
@@ -16,6 +16,22 @@ import { TransferStep } from "@/components/transfer-step"
 export default function Page() {
   const { logout, user } = useCrossmintAuth()
   const { wallet, status: walletStatus } = useWallet()
+
+  if (!user) return <LandingPage isLoading={false} />
+  if (walletStatus === "in-progress" || walletStatus === "not-loaded") return <CreatingWalletScreen />
+
+  return <AppContent wallet={wallet!} user={user} logout={logout} />
+}
+
+function AppContent({
+  wallet,
+  user,
+  logout,
+}: {
+  wallet: Wallet<Chain>
+  user: { email?: string }
+  logout: () => void
+}) {
   const [signers, setSigners] = useState<Signer[]>([])
   const [signersLoaded, setSignersLoaded] = useState(false)
   const [authorizing, setAuthorizing] = useState(false)
@@ -23,9 +39,18 @@ export default function Page() {
   const [balance, setBalance] = useState<string | null>(null)
   const [walletRefreshKey, setWalletRefreshKey] = useState(0)
   const [transferCompleted, setTransferCompleted] = useState(false)
+  const [showCode1, setShowCode1] = useState(false)
+  const [showCode2, setShowCode2] = useState(false)
+  const [showCode3, setShowCode3] = useState(false)
+
+  // Entrance animation — starts false, set true after first paint
+  const [entered, setEntered] = useState(false)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setEntered(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
 
   const refreshSigners = useCallback(async () => {
-    if (!wallet) return
     try {
       const list = await wallet.signers()
       setSigners(list ?? [])
@@ -34,7 +59,6 @@ export default function Page() {
   }, [wallet])
 
   const refreshBalance = useCallback(async () => {
-    if (!wallet) return
     try {
       const balances = await wallet.balances(["usdxm"])
       const token = balances.tokens.find((t) => t.symbol === "usdxm")
@@ -49,21 +73,11 @@ export default function Page() {
     refreshBalance()
   }, [refreshSigners, refreshBalance])
 
-  const [entered, setEntered] = useState(false)
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setEntered(true))
-    return () => cancelAnimationFrame(frame)
-  }, [])
-
   const hasServerSigner = signers.some((s) => s.type === "server")
-
-  const [showCode1, setShowCode1] = useState(false)
-  const [showCode2, setShowCode2] = useState(false)
-  const [showCode3, setShowCode3] = useState(false)
-  const activeStep = !wallet ? 1 : !hasServerSigner ? 2 : 3
+  const activeStep: 1 | 2 | 3 = !hasServerSigner ? 2 : 3
 
   const handleAuthorize = async () => {
-    if (!wallet?.address || !user?.email) return
+    if (!wallet.address || !user.email) return
     setAuthorizing(true)
     setAuthError(null)
     try {
@@ -81,24 +95,26 @@ export default function Page() {
   }
 
   const handleDeposit = async (amount: number) => {
-    if (!wallet) throw new Error("Wallet not available")
     await (wallet as any).stagingFund(amount)
     await refreshBalance()
     setWalletRefreshKey((k) => k + 1)
   }
 
   const handleTransfer = async (recipient: string) => {
-    if (!wallet?.address) throw new Error("Wallet not available")
     const result = await sendUsdxmFromServer({ walletAddress: wallet.address, recipient, amount: "5" })
     await refreshBalance()
     setWalletRefreshKey((k) => k + 1)
     return result
   }
 
-  if (!user) return <LandingPage isLoading={false} />
-  if (walletStatus === "in-progress" || walletStatus === "not-loaded") return <CreatingWalletScreen />
-
   const userInitial = (user.email?.[0] ?? "U").toUpperCase()
+
+  const slideStyle = (delay: number, opacityOverride?: number): React.CSSProperties => ({
+    opacity: entered ? (opacityOverride ?? 1) : 0,
+    transform: entered ? "translateY(0)" : "translateY(40px)",
+    transition: "opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1)",
+    transitionDelay: `${delay}ms`,
+  })
 
   return (
     <div className="min-h-dvh bg-[#F7F5F4] relative">
@@ -119,17 +135,12 @@ export default function Page() {
       <div className="max-w-[720px] mx-auto px-6 pt-[88px] pb-16 relative translate-x-6">
 
         {/* Sidebar */}
-        <aside className="absolute right-full top-[88px] pr-10 w-56 pt-1 -translate-x-20" style={{
-          opacity: entered ? 1 : 0,
-          transform: entered ? "translateY(0)" : "translateY(40px)",
-          transition: "opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1)",
-          transitionDelay: "0ms",
-        }}>
+        <aside className="absolute right-full top-[88px] pr-10 w-56 pt-1 -translate-x-20" style={slideStyle(0)}>
           <h1 className="font-[family-name:var(--font-heading)] font-medium text-[26px] leading-[1.1] tracking-[-0.6px] text-[#00150d] mb-8">
             Stablecoin Wallet<br />for Agents
           </h1>
           <nav className="border-l border-[rgba(0,0,0,0.1)] flex flex-col gap-2">
-            <SidebarItem active={activeStep === 1} completed={activeStep > 1} label="Create wallet" />
+            <SidebarItem active={false} completed={true} label="Create wallet" />
             <SidebarItem active={activeStep === 2} completed={activeStep > 2} label="Authorize agent" />
             <SidebarItem active={activeStep === 3} completed={transferCompleted} label="Transfer funds" />
           </nav>
@@ -139,18 +150,13 @@ export default function Page() {
         <div className="space-y-7">
 
           {/* Step 1 */}
-          <div className="bg-white rounded-[10px] p-5" style={{
-            opacity: entered ? 1 : 0,
-            transform: entered ? "translateY(0)" : "translateY(40px)",
-            transition: "opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1)",
-            transitionDelay: "80ms",
-          }}>
+          <div className="bg-white rounded-[10px] p-5" style={slideStyle(80)}>
             <div className="flex items-start justify-between mb-6">
               <StepHeader step="01" title="Create wallet" subtitle="Your wallet is created automatically when you sign in." />
               <ViewToggle showCode={showCode1} onChange={setShowCode1} />
             </div>
             <WalletStep
-              address={wallet?.address ?? ""}
+              address={wallet.address}
               email={user.email ?? ""}
               balance={balance}
               refreshKey={walletRefreshKey}
@@ -160,49 +166,43 @@ export default function Page() {
 
           {/* Step 2 */}
           <div
-            className={`bg-white rounded-[10px] p-5 transition-opacity ${activeStep < 2 ? "opacity-50 pointer-events-none" : ""}`}
-            style={{
-              opacity: entered ? (activeStep < 2 ? 0.5 : 1) : 0,
-              transform: entered ? "translateY(0)" : "translateY(40px)",
-              transition: "opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1)",
-              transitionDelay: "180ms",
-            }}
+            className={activeStep < 2 ? "pointer-events-none" : ""}
+            style={slideStyle(180, activeStep < 2 ? 0.5 : 1)}
           >
-            <div className="flex items-start justify-between mb-6">
-              <StepHeader step="02" title="Authorize agent" subtitle="Give your agent permission to sign transactions on your behalf." />
-              <ViewToggle showCode={showCode2} onChange={setShowCode2} />
+            <div className="bg-white rounded-[10px] p-5">
+              <div className="flex items-start justify-between mb-6">
+                <StepHeader step="02" title="Authorize agent" subtitle="Give your agent permission to sign transactions on your behalf." />
+                <ViewToggle showCode={showCode2} onChange={setShowCode2} />
+              </div>
+              <AuthorizeStep
+                onAuthorize={handleAuthorize}
+                authorizing={authorizing}
+                error={authError}
+                hasServerSigner={hasServerSigner}
+                signersLoaded={signersLoaded}
+                showCode={showCode2}
+              />
             </div>
-            <AuthorizeStep
-              onAuthorize={handleAuthorize}
-              authorizing={authorizing}
-              error={authError}
-              hasServerSigner={hasServerSigner}
-              signersLoaded={signersLoaded}
-              showCode={showCode2}
-            />
           </div>
 
           {/* Step 3 */}
           <div
-            className={`bg-white rounded-[10px] p-5 ${activeStep < 3 ? "pointer-events-none" : ""}`}
-            style={{
-              opacity: entered ? (activeStep < 3 ? 0.5 : 1) : 0,
-              transform: entered ? "translateY(0)" : "translateY(40px)",
-              transition: "opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1)",
-              transitionDelay: "280ms",
-            }}
+            className={activeStep < 3 ? "pointer-events-none" : ""}
+            style={slideStyle(280, activeStep < 3 ? 0.5 : 1)}
           >
-            <div className="flex items-start justify-between mb-6">
-              <StepHeader step="03" title="Transfer funds" subtitle="Send 5 USDXM to any wallet address." />
-              <ViewToggle showCode={showCode3} onChange={setShowCode3} />
+            <div className="bg-white rounded-[10px] p-5">
+              <div className="flex items-start justify-between mb-6">
+                <StepHeader step="03" title="Transfer funds" subtitle="Send 5 USDXM to any wallet address." />
+                <ViewToggle showCode={showCode3} onChange={setShowCode3} />
+              </div>
+              <TransferStep
+                onTransfer={handleTransfer}
+                onDeposit={handleDeposit}
+                onTransferComplete={() => setTransferCompleted(true)}
+                balance={balance}
+                showCode={showCode3}
+              />
             </div>
-            <TransferStep
-              onTransfer={handleTransfer}
-              onDeposit={handleDeposit}
-              onTransferComplete={() => setTransferCompleted(true)}
-              balance={balance}
-              showCode={showCode3}
-            />
           </div>
 
         </div>
