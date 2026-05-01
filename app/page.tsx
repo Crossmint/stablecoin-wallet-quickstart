@@ -1,45 +1,36 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useCrossmintAuth, useWallet } from "@crossmint/client-sdk-react-ui"
 import type { Signer } from "@crossmint/wallets-sdk"
+import { Check, Circle } from "lucide-react"
+import { ViewToggle } from "@/components/wallet-step"
 import { prepareServerSigner } from "@/app/actions/add-server-signer"
 import { sendUsdxmFromServer } from "@/app/actions/send-usdxm"
 import { LandingPage } from "@/components/landing-page"
 import { CreatingWalletScreen } from "@/components/creating-wallet-screen"
-import { WalletCard } from "@/components/wallet-card"
-import { AgentCard } from "@/components/agent-card"
-
-type AppPhase =
-  | "creating"
-  | "wallet-shown"
-  | "agent-entering"
-  | "agent-initializing"
-  | "agent-ready"
-  | "authorized"
+import { WalletStep } from "@/components/wallet-step"
+import { AuthorizeStep } from "@/components/authorize-step"
+import { TransferStep } from "@/components/transfer-step"
 
 export default function Page() {
-  const { logout, user, status: authStatus } = useCrossmintAuth()
+  const { logout, user } = useCrossmintAuth()
   const { wallet, status: walletStatus } = useWallet()
-  const [phase, setPhase] = useState<AppPhase>("creating")
   const [signers, setSigners] = useState<Signer[]>([])
+  const [signersLoaded, setSignersLoaded] = useState(false)
   const [authorizing, setAuthorizing] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
-  const sequenceStarted = useRef(false)
-  // Ref so the final timeout can read the latest value without being in deps
-  const hasServerSignerRef = useRef(false)
-
   const [balance, setBalance] = useState<string | null>(null)
   const [walletRefreshKey, setWalletRefreshKey] = useState(0)
+  const [transferCompleted, setTransferCompleted] = useState(false)
 
   const refreshSigners = useCallback(async () => {
     if (!wallet) return
     try {
       const list = await wallet.signers()
       setSigners(list ?? [])
-    } catch (err) {
-      console.error("Failed to load signers:", err)
-    }
+    } catch {}
+    finally { setSignersLoaded(true) }
   }, [wallet])
 
   const refreshBalance = useCallback(async () => {
@@ -58,44 +49,18 @@ export default function Page() {
     refreshBalance()
   }, [refreshSigners, refreshBalance])
 
+  const [entered, setEntered] = useState(false)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setEntered(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
   const hasServerSigner = signers.some((s) => s.type === "server")
 
-  // Keep ref in sync so timeouts can read it without stale closure
-  hasServerSignerRef.current = hasServerSigner
-
-  // Always play the full animation sequence; only the final state differs
-  useEffect(() => {
-    if (!wallet || sequenceStarted.current) return
-    sequenceStarted.current = true
-
-    setPhase("wallet-shown")
-    const t1 = setTimeout(() => setPhase("agent-entering"), 1400)
-    const t2 = setTimeout(() => setPhase("agent-initializing"), 2100)
-    const t3 = setTimeout(() => {
-      // At sequence end, pick the right resting state
-      setPhase(hasServerSignerRef.current ? "authorized" : "agent-ready")
-    }, 5200)
-
-    return () => {
-      sequenceStarted.current = false
-      clearTimeout(t1)
-      clearTimeout(t2)
-      clearTimeout(t3)
-    }
-  }, [wallet])
-
-  const handleDeposit = async (amount: number) => {
-    if (!wallet) throw new Error("Wallet not available")
-    await (wallet as any).stagingFund(amount)
-    await refreshBalance()
-    setWalletRefreshKey((k) => k + 1)
-  }
-
-  const handleTransfer = async (recipient: string) => {
-    if (!wallet?.address) throw new Error("Wallet not available")
-    await sendUsdxmFromServer({ walletAddress: wallet.address, recipient, amount: "5" })
-    await refreshBalance()
-  }
+  const [showCode1, setShowCode1] = useState(false)
+  const [showCode2, setShowCode2] = useState(false)
+  const [showCode3, setShowCode3] = useState(false)
+  const activeStep = !wallet ? 1 : !hasServerSigner ? 2 : 3
 
   const handleAuthorize = async () => {
     if (!wallet?.address || !user?.email) return
@@ -108,7 +73,6 @@ export default function Page() {
         await wallet.approve({ signatureId: prepared.signatureId })
       }
       await refreshSigners()
-      setPhase("authorized")
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : "Unknown error")
     } finally {
@@ -116,72 +80,166 @@ export default function Page() {
     }
   }
 
-  if (!user) return <LandingPage isLoading={false} />
-
-  if (walletStatus === "in-progress" || walletStatus === "not-loaded") {
-    return <CreatingWalletScreen />
+  const handleDeposit = async (amount: number) => {
+    if (!wallet) throw new Error("Wallet not available")
+    await (wallet as any).stagingFund(amount)
+    await refreshBalance()
+    setWalletRefreshKey((k) => k + 1)
   }
+
+  const handleTransfer = async (recipient: string) => {
+    if (!wallet?.address) throw new Error("Wallet not available")
+    const result = await sendUsdxmFromServer({ walletAddress: wallet.address, recipient, amount: "5" })
+    await refreshBalance()
+    setWalletRefreshKey((k) => k + 1)
+    return result
+  }
+
+  if (!user) return <LandingPage isLoading={false} />
+  if (walletStatus === "in-progress" || walletStatus === "not-loaded") return <CreatingWalletScreen />
 
   const userInitial = (user.email?.[0] ?? "U").toUpperCase()
 
   return (
-    <div className="min-h-screen bg-[#f7f5f4] relative">
-      {/* Sidebar — absolute so cards center against full viewport */}
-      <div className="absolute top-0 left-0 pl-12 pt-10">
-        <h1 className="text-[28px] font-semibold tracking-tight leading-[1.2] text-[#00150d]">
-          Stablecoin Wallet
-          <br />
-          for Agents
-        </h1>
+    <div className="min-h-dvh bg-[#F7F5F4] relative">
+      {/* Top-right: avatar + logout */}
+      <div className="absolute top-5 right-8 flex items-center gap-3">
+        <button
+          onClick={logout}
+          className="text-xs text-black/40 hover:text-black/60 transition-colors"
+        >
+          Log out
+        </button>
+        <div className="w-9 h-9 rounded-full bg-[#eaeaea] flex items-center justify-center">
+          <span className="text-[#00150d] font-medium text-[16px]">{userInitial}</span>
+        </div>
       </div>
 
-      {/* Full-width layout */}
-      <div className="flex flex-col min-h-screen">
-        {/* Navbar — avatar + logout pinned to the right */}
-        <div className="flex items-center justify-end px-10 pt-3 pb-3">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={logout}
-              className="text-xs text-black/40 hover:text-black/60 transition-colors"
-            >
-              Log out
-            </button>
-            <div className="w-9 h-9 rounded-full bg-[#eaeaea] flex items-center justify-center">
-              <span className="text-[#00150d] font-medium text-[16px]">{userInitial}</span>
+      {/* Main layout */}
+      <div className="max-w-[720px] mx-auto px-6 pt-[88px] pb-16 relative translate-x-6">
+
+        {/* Sidebar */}
+        <aside className="absolute right-full top-[88px] pr-10 w-56 pt-1 -translate-x-20" style={{
+          opacity: entered ? 1 : 0,
+          transform: entered ? "translateY(0)" : "translateY(40px)",
+          transition: "opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1)",
+          transitionDelay: "0ms",
+        }}>
+          <h1 className="font-[family-name:var(--font-heading)] font-medium text-[26px] leading-[1.1] tracking-[-0.6px] text-[#00150d] mb-8">
+            Stablecoin Wallet<br />for Agents
+          </h1>
+          <nav className="border-l border-[rgba(0,0,0,0.1)] flex flex-col gap-2">
+            <SidebarItem active={activeStep === 1} completed={activeStep > 1} label="Create wallet" />
+            <SidebarItem active={activeStep === 2} completed={activeStep > 2} label="Authorize agent" />
+            <SidebarItem active={activeStep === 3} completed={transferCompleted} label="Transfer funds" />
+          </nav>
+        </aside>
+
+        {/* Steps */}
+        <div className="space-y-7">
+
+          {/* Step 1 */}
+          <div className="bg-white rounded-[10px] p-5" style={{
+            opacity: entered ? 1 : 0,
+            transform: entered ? "translateY(0)" : "translateY(40px)",
+            transition: "opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1)",
+            transitionDelay: "80ms",
+          }}>
+            <div className="flex items-start justify-between mb-6">
+              <StepHeader step="01" title="Create wallet" subtitle="Your wallet is created automatically when you sign in." />
+              <ViewToggle showCode={showCode1} onChange={setShowCode1} />
             </div>
+            <WalletStep
+              address={wallet?.address ?? ""}
+              email={user.email ?? ""}
+              balance={balance}
+              refreshKey={walletRefreshKey}
+              showCode={showCode1}
+            />
           </div>
-        </div>
 
-        {/* Cards — centered in full viewport width */}
-        <div className="flex flex-col items-center gap-4 px-4 pt-2 pb-16">
-          {wallet && (
-            <div className="w-full max-w-xl">
-              <WalletCard
-                address={wallet.address}
-                email={user.email ?? ""}
-                wallet={wallet}
-                refreshKey={walletRefreshKey}
-              />
+          {/* Step 2 */}
+          <div
+            className={`bg-white rounded-[10px] p-5 transition-opacity ${activeStep < 2 ? "opacity-50 pointer-events-none" : ""}`}
+            style={{
+              opacity: entered ? (activeStep < 2 ? 0.5 : 1) : 0,
+              transform: entered ? "translateY(0)" : "translateY(40px)",
+              transition: "opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1)",
+              transitionDelay: "180ms",
+            }}
+          >
+            <div className="flex items-start justify-between mb-6">
+              <StepHeader step="02" title="Authorize agent" subtitle="Give your agent permission to sign transactions on your behalf." />
+              <ViewToggle showCode={showCode2} onChange={setShowCode2} />
             </div>
-          )}
-
-          {(phase === "agent-entering" ||
-            phase === "agent-initializing" ||
-            phase === "agent-ready" ||
-            phase === "authorized") && (
-            <AgentCard
-              phase={phase}
+            <AuthorizeStep
               onAuthorize={handleAuthorize}
               authorizing={authorizing}
               error={authError}
-              balance={balance}
-              walletAddress={wallet?.address ?? ""}
-              onDeposit={handleDeposit}
-              onTransfer={handleTransfer}
+              hasServerSigner={hasServerSigner}
+              signersLoaded={signersLoaded}
+              showCode={showCode2}
             />
-          )}
+          </div>
+
+          {/* Step 3 */}
+          <div
+            className={`bg-white rounded-[10px] p-5 ${activeStep < 3 ? "pointer-events-none" : ""}`}
+            style={{
+              opacity: entered ? (activeStep < 3 ? 0.5 : 1) : 0,
+              transform: entered ? "translateY(0)" : "translateY(40px)",
+              transition: "opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1)",
+              transitionDelay: "280ms",
+            }}
+          >
+            <div className="flex items-start justify-between mb-6">
+              <StepHeader step="03" title="Transfer funds" subtitle="Send 5 USDXM to any wallet address." />
+              <ViewToggle showCode={showCode3} onChange={setShowCode3} />
+            </div>
+            <TransferStep
+              onTransfer={handleTransfer}
+              onDeposit={handleDeposit}
+              onTransferComplete={() => setTransferCompleted(true)}
+              balance={balance}
+              showCode={showCode3}
+            />
+          </div>
+
         </div>
       </div>
+    </div>
+  )
+}
+
+function StepHeader({ step, title, subtitle }: { step: string; title: string; subtitle: string }) {
+  return (
+    <div>
+      <div className="flex items-baseline gap-1.5 font-[family-name:var(--font-heading)] font-medium text-[20px] leading-[1.4] tracking-[-0.5px] text-[#00150d]">
+        <span className="opacity-40">Step {step}</span>
+        <span>{title}</span>
+      </div>
+      <p className="text-sm text-black/50 leading-5 mt-0.5">{subtitle}</p>
+    </div>
+  )
+}
+
+function SidebarItem({ active, completed, label }: { active: boolean; completed: boolean; label: string }) {
+  return (
+    <div
+      className={`flex items-center gap-2.5 px-4 py-1.5 border-l-2 transition-all ${
+        active ? "border-[#05B959] text-[#00150d]" : "border-transparent text-[#00150d] opacity-40"
+      }`}
+    >
+      {completed ? (
+        <div className="size-4 rounded-full bg-[#05B959] flex items-center justify-center shrink-0">
+          <Check className="size-2.5 text-white stroke-[3]" />
+        </div>
+      ) : (
+        <Circle className="size-4 shrink-0" strokeWidth={1.5} />
+      )}
+      <span className="font-[family-name:var(--font-heading)] font-medium text-[15px] leading-6 whitespace-nowrap">
+        {label}
+      </span>
     </div>
   )
 }

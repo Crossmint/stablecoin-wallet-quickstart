@@ -64,9 +64,6 @@ a[href="https://stytch.com/"] {
     }
 }
 
-.animate-slide-up {
-    animation: slide-up-fade 0.65s ease-in forwards;
-}
 
 @keyframes dot-pulse {
     0%, 100% { opacity: 0.3; }

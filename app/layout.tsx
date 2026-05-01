@@ -1,6 +1,6 @@
 "use client";
 
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist, Geist_Mono, Manrope } from "next/font/google"
 
 import "./globals.css"
 import {
@@ -10,11 +10,8 @@ import {
 } from "@crossmint/client-sdk-react-ui"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
-
-const fontMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-})
+const fontMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" })
+const manrope = Manrope({ subsets: ["latin"], variable: "--font-heading" })
 
 export default function RootLayout({
   children,
@@ -24,7 +21,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`antialiased font-sans ${geist.variable} ${fontMono.variable}`}
+      className={`antialiased font-sans ${geist.variable} ${fontMono.variable} ${manrope.variable}`}
     >
       <head>
         <title>Stablecoin Wallet Quickstart</title>
