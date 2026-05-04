@@ -34,10 +34,8 @@ export default function Page() {
   }, [refreshSigners])
   const hasServerSigner = signers.some((s) => s.type === "server")
 
-  const isLoading = status === "in-progress" || status === "not-loaded"
-
   if (!user) {
-    return <LandingPage isLoading={isLoading} />
+    return <LandingPage />
   }
 
   return (
