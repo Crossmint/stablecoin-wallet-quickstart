@@ -17,7 +17,7 @@ export default function Page() {
   const { logout, user } = useCrossmintAuth()
   const { wallet, status: walletStatus } = useWallet()
 
-  if (!user) return <LandingPage isLoading={false} />
+  if (!user) return <LandingPage />
   if (walletStatus === "in-progress" || walletStatus === "not-loaded") return <CreatingWalletScreen />
 
   return <AppContent wallet={wallet!} user={user} logout={logout} />
